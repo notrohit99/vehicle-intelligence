@@ -1,0 +1,17 @@
+settings_version: 0.0.4
+datasets_dir: E:\SIH2026\datasets
+weights_dir: E:\SIH2026\sih-vehicle-intelligence\weights
+runs_dir: E:\SIH2026\sih-vehicle-intelligence\runs
+uuid: 1de6234d57c844926feb1815010a9dfb81086c2deaa33f71f1aad1e3ec0fca31
+sync: true
+api_key: ''
+openai_api_key: ''
+clearml: true
+comet: true
+dvc: true
+hub: true
+mlflow: true
+neptune: true
+raytune: true
+tensorboard: true
+wandb: true
