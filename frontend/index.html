@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CITY trace - Vehicle Intelligence</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+
+<body>
+
+    <!-- ================= SIDEBAR ================= -->
+    <aside class="sidebar">
+        <div class="logo">
+            <img src="indian_emblam.jpg" alt="Indian National Emblem" class="indian-emblem">
+            <div>
+                <h2>C I T Y <span>trace</span></h2>
+                <p>Smart city vehicle intelligence</p>
+            </div>
+        </div>
+        <nav>
+            <a href="#" class="active"><i class="fa-solid fa-house"></i> Dashboard</a>
+            <a href="#"><i class="fa-solid fa-video"></i> Live Cameras</a>
+            <a href="#"><i class="fa-solid fa-car"></i> Vehicles</a>
+            <a href="map.html"><i class="fa-solid fa-map-location-dot"></i> GIS Map</a>
+            <a href="#" id="settingsBtn"><i class="fa-solid fa-gear"></i> Settings</a>
+        </nav>
+    </aside>
+
+    <!-- ================= MAIN CONTENT ================= -->
+    <main class="main-content">
+
+        <!-- HEADER -->
+        <header>
+            <div>
+                <h1>Vehicle Intelligence Dashboard</h1>
+                <p>AI Powered Smart Traffic Monitoring System</p>
+            </div>
+            <div class="header-right">
+                <div class="status"><span class="dot"></span>AI System Online</div>
+                <div class="admin"><i class="fa-solid fa-user"></i> Admin</div>
+            </div>
+        </header>
+
+        <!-- ================= ALERT BANNER ================= -->
+        <div id="alertBanner" class="alert-banner" style="display:none;"></div>
+
+        <!-- ================= STATISTICS ================= -->
+        <section class="stats">
+            <div class="card">
+                <div class="card-icon green"><i class="fa-solid fa-car"></i></div>
+                <div>
+                    <p>Total Vehicles</p>
+                    <h2 id="totalVehicles">0</h2>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-icon blue"><i class="fa-solid fa-video"></i></div>
+                <div>
+                    <p>Active Cameras</p>
+                    <h2>1</h2>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-icon purple"><i class="fa-solid fa-location-dot"></i></div>
+                <div>
+                    <p>Tracked Vehicles</p>
+                    <h2 id="trackedVehicles">0</h2>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                <div>
+                    <p>Active Alerts</p>
+                    <h2 id="alertCount">0</h2>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= DASHBOARD GRID ================= -->
+        <section class="dashboard-grid">
+
+            <!-- LIVE VIDEO -->
+            <div class="panel video-panel">
+                <div class="api-controls">
+                    <div class="api-file-row">
+                        <label class="file-picker">
+                            <i class="fa-solid fa-upload"></i>
+                            <span id="selectedFileName">Choose vehicle video</span>
+                            <input type="file" id="videoFileInput" accept="video/mp4,video/avi,video/quicktime,video/x-matroska,.mp4,.avi,.mov,.mkv">
+                        </label>
+                        <input type="text" id="cameraIdInput" class="camera-input" value="CAM_01" placeholder="Camera ID">
+                        <button id="processVideoBtn" class="process-btn" type="button">
+                            <i class="fa-solid fa-play"></i> Process Video
+                        </button>
+                    </div>
+                    <div id="processingMessage" class="processing-message"></div>
+                </div>
+
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-video"></i> Live Vehicle Intelligence</h2>
+                    <span class="live">LIVE</span>
+                </div>
+
+                <!-- VIDEO: no <source> tag — JS sets .src directly to object URL -->
+                <video id="liveVideo" controls muted playsinline>
+                    Your browser does not support video playback.
+                </video>
+            </div>
+
+            <!-- ================= VEHICLE DATABASE ================= -->
+            <div class="panel database-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-database"></i> Vehicle Database</h2>
+                    <span class="vehicle-count-badge" id="vehicleCountBadge">0 vehicles</span>
+                </div>
+
+                <div class="table-scroll-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Track ID</th>
+                                <th>Plate</th>
+                                <th>Type</th>
+                                <th>Conf.</th>
+                                <th>Alert</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vehicleTableBody">
+                            <tr>
+                                <td colspan="5" style="text-align:center;color:#8297ad;padding:20px;">
+                                    Upload a video and click Process Video
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ================= TRAFFIC ANALYTICS ================= -->
+            <div class="panel analytics-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-chart-column"></i> Traffic Analytics</h2>
+                </div>
+                <div id="trafficChart" class="traffic-chart"></div>
+            </div>
+
+            <!-- ================= AI SYSTEM STATUS ================= -->
+            <div class="panel system-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-microchip"></i> AI System Status</h2>
+                </div>
+                <div class="system-status">
+                    <p><span class="dot"></span> Vehicle Detection <strong id="detectionStatus">ACTIVE</strong></p>
+                    <p><span class="dot"></span> Vehicle Tracking <strong id="trackingStatus">ACTIVE</strong></p>
+                    <p><span class="dot"></span> Number Plate Detection <strong id="plateStatus">PROCESSING</strong></p>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ================= ALERT SYSTEM PANEL ================= -->
+        <section class="alert-section">
+            <div class="panel alert-panel">
+                <div class="panel-header">
+                    <h2><i class="fa-solid fa-shield-halved"></i> Alert System</h2>
+                    <div class="alert-panel-controls">
+                        <button class="alert-clear-btn" id="clearAlertsBtn" type="button">
+                            <i class="fa-solid fa-trash-can"></i> Clear All
+                        </button>
+                    </div>
+                </div>
+
+                <!-- BLACKLIST MANAGER -->
+                <div class="blacklist-manager">
+                    <h3><i class="fa-solid fa-ban"></i> Blacklisted Plates</h3>
+                    <div class="blacklist-input-row">
+                        <input type="text" id="blacklistInput" class="blacklist-input" placeholder="Enter plate number (e.g. DL4CAB1234)">
+                        <button id="addBlacklistBtn" class="add-blacklist-btn" type="button">
+                            <i class="fa-solid fa-plus"></i> Add to Blacklist
+                        </button>
+                    </div>
+                    <div id="blacklistTags" class="blacklist-tags"></div>
+                </div>
+
+                <!-- ACTIVE ALERTS LOG -->
+                <div class="alerts-log">
+                    <h3><i class="fa-solid fa-bell"></i> Active Alerts <span id="alertBadge" class="alert-badge">0</span></h3>
+                    <div id="alertsContainer" class="alerts-container">
+                        <p class="no-alerts-msg">No alerts detected. System monitoring active.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ================= SETTINGS MODAL ================= -->
+    <div class="settings-overlay" id="settingsOverlay">
+        <div class="settings-box">
+            <div class="settings-header">
+                <h2><i class="fa-solid fa-gear"></i> Settings</h2>
+                <button id="closeSettings"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="setting-option">
+                <div>
+                    <h3>Appearance</h3>
+                    <p>Switch between dark and light theme</p>
+                </div>
+                <label class="theme-switch">
+                    <input type="checkbox" id="themeToggle">
+                    <span class="slider">
+                        <i class="fa-solid fa-sun sun-icon"></i>
+                        <i class="fa-solid fa-moon moon-icon"></i>
+                    </span>
+                </label>
+            </div>
+
+            <!-- OCR Threshold -->
+            <div class="setting-option">
+                <div>
+                    <h3>OCR Confidence Threshold</h3>
+                    <p>Minimum plate recognition confidence (%)</p>
+                </div>
+                <div class="threshold-control">
+                    <input type="range" id="ocrThreshold" min="10" max="99" value="50" step="1">
+                    <span id="ocrThresholdVal">50%</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ================= FOOTER ================= -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-logo"><strong>C I T Y <span>trace</span></strong></div>
+            <div class="footer-text"><span>Secure • Intelligent • Connected</span></div>
+            <div class="footer-powered">
+                <span>Powered by AI</span><span>•</span>
+                <span>Secured by Innovation</span><span>•</span>
+                <span>Built for Smart Cities</span>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

@@ -58,7 +58,14 @@ class TrackingService:
         try:
             return self.process_video_path(tmp_path)
         finally:
-            Path(tmp_path).unlink(missing_ok=True)
+            import gc
+            for _ in range(5):
+                try:
+                    Path(tmp_path).unlink(missing_ok=True)
+                    break
+                except Exception:
+                    gc.collect()
+                    time.sleep(0.3)
 
     def process_video_path(self, video_path: str) -> TrackingResponse:
         start = time.time()
@@ -71,17 +78,23 @@ class TrackingService:
 
         all_tracks: list[TrackDetectionSchema] = []
         frame_index = 0
+        frame_stride = 2  # Process every 2nd frame for 2x faster execution
 
         while cap.isOpened():
             success, frame = cap.read()
             if not success:
                 break
 
-            tracks = self.pipeline.process_frame(frame, frame_index=frame_index, fps=fps)
-            all_tracks.extend(_to_track_schema(t) for t in tracks)
+            if frame_index % frame_stride == 0:
+                tracks = self.pipeline.process_frame(frame, frame_index=frame_index, fps=fps)
+                all_tracks.extend(_to_track_schema(t) for t in tracks)
+
             frame_index += 1
 
         cap.release()
+        del cap
+        import gc
+        gc.collect()
 
         return TrackingResponse(
             source_type="video",

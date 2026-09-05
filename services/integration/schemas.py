@@ -4,20 +4,24 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
 
 class VehicleRecordSchema(BaseModel):
-    global_vehicle_candidate: str
     tracking_id: int
-    plate_confidence: float = Field(..., ge=0.0, le=1.0)
-    timestamp: str
+    plate_number: Optional[str] = None
+    global_vehicle_candidate: Optional[str] = None
+    plate_confidence: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    timestamp: Optional[str] = None
+    timestamp_sec: Optional[float] = None
     camera_id: str
-    bbox: list[int] = Field(..., min_length=4, max_length=4)
-    vehicle_bbox: list[int] | None = Field(default=None, min_length=4, max_length=4)
-    class_name: str | None = None
-    frame: int | None = None
+    vehicle_bbox: Optional[list[int]] = Field(default=None)
+    plate_bbox: Optional[list[int]] = Field(default=None)
+    bbox: Optional[list[int]] = Field(default=None)
+    class_name: Optional[str] = None
+    frame: Optional[int] = None
 
 
 class ProcessVideoResponse(BaseModel):

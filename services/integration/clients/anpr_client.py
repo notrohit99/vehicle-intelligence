@@ -30,3 +30,7 @@ class ANPRClient:
             )
             response.raise_for_status()
             return response.json()
+
+
+ANPR_URL = "http://localhost:8000"
+TRACKING_URL = "http://localhost:8001"

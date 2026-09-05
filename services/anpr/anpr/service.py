@@ -67,7 +67,14 @@ class ANPRService:
         try:
             return self.process_video_path(tmp_path)
         finally:
-            Path(tmp_path).unlink(missing_ok=True)
+            import gc
+            for _ in range(5):
+                try:
+                    Path(tmp_path).unlink(missing_ok=True)
+                    break
+                except Exception:
+                    gc.collect()
+                    time.sleep(0.3)
 
     def process_video_path(self, video_path: str) -> ANPRResponse:
         start = time.time()
@@ -96,6 +103,9 @@ class ANPRService:
             frame_index += 1
 
         cap.release()
+        del cap
+        import gc
+        gc.collect()
 
         return ANPRResponse(
             source_type="video",

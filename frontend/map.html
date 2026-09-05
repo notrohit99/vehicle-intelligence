@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CITY trace – GIS Traffic Analytics</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Main style -->
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        body { display: flex; flex-direction: row; min-height: 100vh; overflow: hidden; }
+        .main-content { overflow-y: auto; display: flex; flex-direction: column; }
+
+        #mapContainer {
+            flex: 1; display: flex; flex-direction: column;
+            gap: 18px; padding: 25px; overflow-y: auto;
+        }
+
+        #cityMap {
+            width: 100%; height: 460px;
+            border-radius: 12px; border: 1px solid #1c3550; z-index: 1;
+        }
+
+        .map-stats-strip {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+        }
+        .map-stat-card {
+            background: #0b1a2d; border: 1px solid #1c3550; border-radius: 10px;
+            padding: 16px 18px; display: flex; align-items: center; gap: 12px;
+        }
+        .map-stat-icon {
+            width: 44px; height: 44px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; flex-shrink: 0;
+        }
+        .map-stat-card p  { font-size: 12px; color: #8297ad; }
+        .map-stat-card h3 { font-size: 24px; margin-top: 2px; }
+
+        .map-bottom-grid {
+            display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px;
+        }
+
+        #trendChart {
+            width: 100%; height: 200px; display: flex;
+            align-items: flex-end; gap: 5px;
+            padding: 10px 0 20px; border-bottom: 1px solid rgba(255,255,255,0.1);
+            box-sizing: border-box; overflow: hidden;
+        }
+        .trend-bar-wrap {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: flex-end; gap: 4px; height: 100%;
+        }
+        .trend-bar {
+            width: 100%; min-height: 4px;
+            border-radius: 4px 4px 0 0; transition: height 0.4s ease;
+        }
+        .trend-label { font-size: 10px; color: #6b8299; text-align: center; }
+        .trend-value { font-size: 11px; color: #fff; font-weight: bold; }
+
+        .sensor-table-wrap {
+            max-height: 260px; overflow-y: auto;
+            scrollbar-width: thin; scrollbar-color: #f6a623 #0b1a2d;
+        }
+        .sensor-table-wrap table { width: 100%; border-collapse: collapse; }
+        .sensor-table-wrap th {
+            position: sticky; top: 0; background: #0b1a2d; color: #8297ad;
+            text-align: left; padding: 8px 10px;
+            border-bottom: 1px solid #1c3550; font-size: 12px;
+        }
+        .sensor-table-wrap td { padding: 8px 10px; border-bottom: 1px solid #102038; font-size: 12px; }
+        .sensor-table-wrap tr:hover { background: #0f2035; }
+
+        .speed-badge {
+            display: inline-block; padding: 2px 8px;
+            border-radius: 10px; font-size: 11px; font-weight: bold;
+        }
+        .speed-free     { background: #0e3d28; color: #36d97d; }
+        .speed-moderate { background: #3d2a0a; color: #f6a623; }
+        .speed-heavy    { background: #3d0f0f; color: #ff4d4d; }
+
+        .map-controls {
+            display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+        }
+        .refresh-btn {
+            background: #f6a623; color: #07111f; border: none;
+            border-radius: 8px; padding: 9px 16px; font-weight: 700;
+            cursor: pointer; font-size: 13px;
+        }
+        .refresh-btn:hover { opacity: 0.9; }
+        .refresh-btn:disabled { opacity: 0.5; cursor: wait; }
+        .auto-refresh-label { color: #8297ad; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+        .last-updated { color: #6b8299; font-size: 12px; margin-left: auto; }
+
+        .loading-overlay {
+            position: absolute; inset: 0; background: rgba(7,17,31,0.7);
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 12px; z-index: 999; font-size: 18px; color: #f6a623; gap: 10px;
+        }
+        #mapWrapper { position: relative; }
+
+        .legend-strip {
+            display: flex; gap: 16px; align-items: center; font-size: 12px; color: #b8c7d9;
+        }
+        .legend-dot {
+            width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 5px;
+        }
+        .ld-free    { background: #36d97d; box-shadow: 0 0 6px #36d97d; }
+        .ld-moderate{ background: #f6a623; box-shadow: 0 0 6px #f6a623; }
+        .ld-heavy   { background: #ff4d4d; box-shadow: 0 0 6px #ff4d4d; }
+
+        /* Leaflet popup dark theme */
+        .leaflet-popup-content-wrapper {
+            background: #0d1f33 !important; border: 1px solid #1c3550 !important;
+            color: #b8c7d9 !important; border-radius: 10px !important;
+        }
+        .leaflet-popup-tip { background: #0d1f33 !important; }
+        .leaflet-popup-content { margin: 10px 14px !important; font-size: 13px; }
+
+        @media (max-width: 1100px) {
+            .map-stats-strip { grid-template-columns: repeat(2, 1fr); }
+            .map-bottom-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ================= SIDEBAR ================= -->
+<aside class="sidebar">
+    <div class="logo">
+        <img src="indian_emblam.jpg" alt="Indian National Emblem" class="indian-emblem">
+        <div>
+            <h2>C I T Y <span>trace</span></h2>
+            <p>Smart city vehicle intelligence</p>
+        </div>
+    </div>
+    <nav>
+        <a href="index.html"><i class="fa-solid fa-house"></i> Dashboard</a>
+        <a href="#"><i class="fa-solid fa-video"></i> Live Cameras</a>
+        <a href="#"><i class="fa-solid fa-car"></i> Vehicles</a>
+        <a href="map.html" class="active"><i class="fa-solid fa-map-location-dot"></i> GIS Map</a>
+        <a href="#" id="settingsBtn"><i class="fa-solid fa-gear"></i> Settings</a>
+    </nav>
+</aside>
+
+<!-- ================= MAIN ================= -->
+<main class="main-content">
+<div id="mapContainer">
+
+    <!-- HEADER -->
+    <header>
+        <div>
+            <h1>
+                <i class="fa-solid fa-map-location-dot" style="color:#f6a623;margin-right:10px;"></i>
+                City Traffic Analytics – GIS Dashboard
+            </h1>
+            <p>Real-time heatmap, speed monitoring and flow analytics across all camera/sensor nodes</p>
+        </div>
+        <div class="header-right">
+            <div class="status"><span class="dot"></span>ST-GCN Model Live</div>
+            <div class="admin"><i class="fa-solid fa-user"></i> Admin</div>
+        </div>
+    </header>
+
+    <!-- CONTROLS -->
+    <div class="panel map-controls" style="padding:12px 18px;">
+        <button class="refresh-btn" id="refreshBtn">
+            <i class="fa-solid fa-rotate-right"></i> Refresh Predictions
+        </button>
+        <label class="auto-refresh-label">
+            <input type="checkbox" id="autoRefresh" checked style="accent-color:#f6a623;">
+            Auto-refresh every 30s
+        </label>
+        <select id="layerSelect" style="background:#102238;border:1px solid #1c3550;color:#b8c7d9;padding:8px 12px;border-radius:8px;outline:none;cursor:pointer;">
+            <option value="heatmap">Heatmap Layer</option>
+            <option value="markers">Sensor Markers</option>
+            <option value="both">Both Layers</option>
+        </select>
+        <span class="last-updated" id="lastUpdated">Last updated: —</span>
+    </div>
+
+    <!-- STATS STRIP -->
+    <div class="map-stats-strip">
+        <div class="map-stat-card">
+            <div class="map-stat-icon" style="background:#123c34;color:#36d97d;">
+                <i class="fa-solid fa-gauge-high"></i>
+            </div>
+            <div><p>Avg Network Speed</p><h3 id="avgSpeed">—</h3></div>
+        </div>
+        <div class="map-stat-card">
+            <div class="map-stat-icon" style="background:#12355b;color:#48a7ff;">
+                <i class="fa-solid fa-circle-nodes"></i>
+            </div>
+            <div><p>Active Sensors</p><h3 id="activeSensors">—</h3></div>
+        </div>
+        <div class="map-stat-card">
+            <div class="map-stat-icon" style="background:#3d2a0a;color:#f6a623;">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div><p>Congested Nodes</p><h3 id="congestedNodes">—</h3></div>
+        </div>
+        <div class="map-stat-card">
+            <div class="map-stat-icon" style="background:#30224f;color:#a974ff;">
+                <i class="fa-solid fa-chart-line"></i>
+            </div>
+            <div><p>Free-Flow Nodes</p><h3 id="freeNodes">—</h3></div>
+        </div>
+    </div>
+
+    <!-- MAP PANEL -->
+    <div class="panel" style="padding:0;overflow:hidden;" id="mapWrapper">
+        <div class="panel-header" style="padding:14px 18px;border-bottom:1px solid #1c3550;">
+            <h2><i class="fa-solid fa-map"></i> Live City Traffic Heatmap – Los Angeles Network</h2>
+            <div class="legend-strip">
+                <span><span class="legend-dot ld-free"></span>Free</span>
+                <span><span class="legend-dot ld-moderate"></span>Moderate</span>
+                <span><span class="legend-dot ld-heavy"></span>Congested</span>
+            </div>
+        </div>
+        <div class="loading-overlay" id="loadingMap">
+            <i class="fa-solid fa-spinner fa-spin"></i>&nbsp; Loading traffic predictions...
+        </div>
+        <div id="cityMap"></div>
+    </div>
+
+    <!-- BOTTOM GRID -->
+    <div class="map-bottom-grid">
+
+        <!-- TREND CHART -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2><i class="fa-solid fa-chart-column"></i> Traffic Flow Trend – Sensor Corridors</h2>
+                <span style="font-size:12px;color:#8297ad;">Normalised speed 0–100</span>
+            </div>
+            <div id="trendChart"></div>
+            <p style="font-size:11px;color:#6b8299;margin-top:8px;">
+                <i class="fa-solid fa-circle-info"></i>
+                Values are ST-GCN normalised speed predictions from METR-LA sensor network. Higher = faster flow.
+            </p>
+        </div>
+
+        <!-- SENSOR TABLE -->
+        <div class="panel">
+            <div class="panel-header">
+                <h2><i class="fa-solid fa-list-ol"></i> Sensor Status</h2>
+                <span id="tableCount" style="font-size:12px;color:#8297ad;">0 sensors</span>
+            </div>
+            <div class="sensor-table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sensor ID</th>
+                            <th>Speed</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sensorTableBody">
+                        <tr><td colspan="3" style="text-align:center;padding:16px;color:#8297ad;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+</main>
+
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet.heat plugin -->
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
+<script>
+// ============================================================
+//  CITY trace — GIS Traffic Analytics
+//  Pulls ST-GCN predictions from Traffic Service (port 8003)
+// ============================================================
+
+const TRAFFIC_API = "http://127.0.0.1:8003";
+
+// ──────────────────────────────────────────────────────────────
+//  METR-LA Sensor GPS Coordinates (CalTrans PEMS)
+//  207 loop detectors across LA County highways
+// ──────────────────────────────────────────────────────────────
+const SENSOR_COORDS = {
+    "773869":[34.06714,-118.26357],"767541":[34.02318,-118.25382],
+    "767542":[34.02475,-118.25476],"717447":[34.00929,-118.47003],
+    "717446":[34.00859,-118.47003],"717445":[34.00707,-118.47003],
+    "717444":[34.00424,-118.47002],"717442":[33.99784,-118.46997],
+    "717441":[33.99424,-118.46963],"717440":[33.98963,-118.46847],
+    "774067":[34.07272,-118.28756],"769443":[34.05387,-118.37203],
+    "767750":[34.04205,-118.25874],"767751":[34.04337,-118.25867],
+    "767610":[34.03442,-118.26014],"773880":[34.07025,-118.27406],
+    "764766":[34.01756,-118.18644],"717497":[34.01413,-118.43974],
+    "717490":[34.00699,-118.44175],"717491":[34.00817,-118.44155],
+    "717492":[34.00959,-118.44010],"717493":[34.01086,-118.43981],
+    "765176":[34.02384,-118.20195],"717498":[34.01569,-118.43988],
+    "717499":[34.01737,-118.43879],"765171":[34.02369,-118.20485],
+    "718064":[34.04040,-118.40055],"718066":[34.04197,-118.40196],
+    "765164":[34.02165,-118.21083],"769431":[34.05235,-118.37427],
+    "769430":[34.05096,-118.37530],"717610":[34.02985,-118.43527],
+    "767053":[34.03720,-118.26624],"767621":[34.03498,-118.25773],
+    "772596":[34.06290,-118.35024],"772597":[34.06355,-118.35104],
+    "767350":[34.03205,-118.26419],"767351":[34.03339,-118.26417],
+    "716571":[33.97395,-118.42126],"773023":[34.06545,-118.31257],
+    "767585":[34.03311,-118.25605],"773024":[34.06610,-118.31273],
+    "717483":[34.00999,-118.44441],"718379":[34.04480,-118.41127],
+    "717481":[34.00833,-118.44448],"717480":[34.00659,-118.44455],
+    "717486":[34.01232,-118.44369],"764120":[34.01235,-118.19539],
+    "772151":[34.06022,-118.35541],"718371":[34.04390,-118.41158],
+    "717489":[34.00620,-118.44171],"717488":[34.00524,-118.44200],
+    "717818":[34.03826,-118.44218],"718076":[34.04147,-118.39961],
+    "718072":[34.04000,-118.40063],"767455":[34.02829,-118.25974],
+    "767454":[34.02674,-118.26014],"761599":[33.99217,-118.14782],
+    "717099":[33.96983,-118.39779],"773916":[34.07106,-118.27082],
+    "716968":[33.99102,-118.44399],"769467":[34.05636,-118.36836],
+    "717576":[34.02603,-118.43564],"717573":[34.02243,-118.43678],
+    "717572":[34.02106,-118.43774],"717571":[34.01966,-118.43846],
+    "717570":[34.01823,-118.43910],"764760":[34.01713,-118.18703],
+    "718089":[34.04307,-118.39814],"769847":[34.05950,-118.35697],
+    "717608":[34.02825,-118.43524],"767523":[34.03023,-118.25730],
+    "716942":[33.98862,-118.44878],"718090":[34.04377,-118.39750],
+    "769867":[34.06021,-118.35620],"717472":[34.00374,-118.44955],
+    "717473":[34.00514,-118.44903],"759591":[33.95621,-118.14108],
+    "764781":[34.01872,-118.18539],"765099":[34.02009,-118.21645],
+    "762329":[33.99716,-118.16039],"716953":[33.98963,-118.44611],
+    "716951":[33.98768,-118.44682],"767509":[34.02959,-118.25748],
+    "765182":[34.02438,-118.20039],"769358":[34.05063,-118.37679],
+    "772513":[34.06173,-118.35250],"716958":[33.99051,-118.44499],
+    "718496":[34.04804,-118.40544],"769346":[34.04953,-118.37794],
+    "773904":[34.07004,-118.27488],"718499":[34.04936,-118.40424],
+    "764853":[34.02025,-118.18394],"761003":[33.98484,-118.15296],
+    "717502":[34.01839,-118.43864],"759602":[33.95721,-118.14023],
+    "717504":[34.01985,-118.43794],"763995":[34.00977,-118.17943],
+    "717508":[34.02256,-118.43676],"765265":[34.02565,-118.19590],
+    "773996":[34.07208,-118.27005],"773995":[34.07128,-118.26983],
+    "717469":[34.00127,-118.45124],"717468":[33.99980,-118.45168],
+    "764106":[34.01123,-118.19571],"717465":[33.99708,-118.45295],
+    "764794":[34.01913,-118.18470],"717466":[33.99842,-118.45226],
+    "717463":[33.99427,-118.45493],"717462":[33.99361,-118.45524],
+    "769345":[34.04866,-118.37890],"716943":[33.98924,-118.44800],
+    "772669":[34.06491,-118.34784],"717582":[34.02736,-118.43543],
+    "717583":[34.02872,-118.43491],"717580":[34.02465,-118.43628],
+    "716949":[33.98855,-118.44763],"717587":[34.03086,-118.43437],
+    "772178":[34.06070,-118.35490],"717585":[34.02978,-118.43473],
+    "716939":[33.98726,-118.44951],"768469":[34.04662,-118.36401],
+    "764101":[34.01043,-118.19602],"767554":[34.03212,-118.25677],
+    "773975":[34.07124,-118.27264],"773974":[34.07055,-118.27257],
+    "717510":[34.02403,-118.43710],"717513":[34.02597,-118.43649],
+    "717825":[34.03964,-118.44141],"767495":[34.02889,-118.25808],
+    "767494":[34.02756,-118.25876],"717821":[34.03640,-118.44276],
+    "717823":[34.03804,-118.44219],"717458":[34.00934,-118.45712],
+    "717459":[34.01075,-118.45661],"769926":[34.06110,-118.35339],
+    "764858":[34.02093,-118.18339],"717450":[34.01560,-118.46121],
+    "717452":[34.01821,-118.45984],"717453":[34.01982,-118.45928],
+    "759772":[33.96088,-118.14461],"717456":[34.02195,-118.45727],
+    "772167":[34.06031,-118.35575],"769372":[34.05237,-118.37282],
+    "774204":[34.07488,-118.28882],"769806":[34.05901,-118.35785],
+    "717590":[34.03236,-118.43379],"717592":[34.03349,-118.43323],
+    "717595":[34.03550,-118.43205],"772168":[34.06048,-118.35530],
+    "718141":[34.04217,-118.40140],"769373":[34.05316,-118.37237]
+};
+
+// ──────────────────────────────────────────────────────────────
+//  INIT MAP (centered on LA, dark CartoDB tiles)
+// ──────────────────────────────────────────────────────────────
+const map = L.map("cityMap", {
+    center: [34.030, -118.390],
+    zoom: 12
+});
+
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    attribution: '&copy; <a href="https://carto.com/">CARTO</a> | &copy; OpenStreetMap contributors',
+    subdomains: "abcd",
+    maxZoom: 20
+}).addTo(map);
+
+let heatLayer = null;
+let markerLayer = L.layerGroup().addTo(map);
+let currentPredictions = {};
+
+// ──────────────────────────────────────────────────────────────
+//  COLOUR HELPERS
+// ──────────────────────────────────────────────────────────────
+function speedColor(v) {
+    if (v < 0.2)  return "#ff4d4d";
+    if (v < 0.45) return "#f6a623";
+    return "#36d97d";
+}
+function speedLabel(v) {
+    if (v < 0.2)  return "Heavy";
+    if (v < 0.45) return "Moderate";
+    return "Free";
+}
+function speedClass(v) {
+    if (v < 0.2)  return "speed-heavy";
+    if (v < 0.45) return "speed-moderate";
+    return "speed-free";
+}
+
+// ──────────────────────────────────────────────────────────────
+//  RENDER MAP LAYERS
+// ──────────────────────────────────────────────────────────────
+function renderLayers(predictions, mode) {
+    if (heatLayer) { map.removeLayer(heatLayer); heatLayer = null; }
+    markerLayer.clearLayers();
+
+    const heatPoints = [];
+
+    for (const [sid, val] of Object.entries(predictions)) {
+        const coords = SENSOR_COORDS[sid];
+        if (!coords) continue;
+        const [lat, lng] = coords;
+        const v = Math.max(0, Math.min(1, val));
+        const kmh = Math.round(v * 120);
+        const color = speedColor(v);
+
+        // intensity = congestion (inverted speed)
+        heatPoints.push([lat, lng, 1 - v + 0.05]);
+
+        if (mode === "markers" || mode === "both") {
+            L.circleMarker([lat, lng], {
+                radius: 7, fillColor: color, color: color,
+                weight: 1.5, opacity: 0.9, fillOpacity: 0.7
+            })
+            .bindPopup(`
+                <strong style="color:#f6a623;">Sensor #${sid}</strong><br>
+                Status: <strong style="color:${color};">${speedLabel(v)}</strong><br>
+                Est. Speed: ~${kmh} km/h<br>
+                Score: ${(v*100).toFixed(1)}%
+            `)
+            .addTo(markerLayer);
+        }
+    }
+
+    if ((mode === "heatmap" || mode === "both") && heatPoints.length) {
+        heatLayer = L.heatLayer(heatPoints, {
+            radius: 22, blur: 18, maxZoom: 14, max: 1.0,
+            gradient: { 0.0:"#36d97d", 0.4:"#f6a623", 0.7:"#ff9900", 1.0:"#ff4d4d" }
+        }).addTo(map);
+    }
+}
+
+// ──────────────────────────────────────────────────────────────
+//  RENDER STATS STRIP
+// ──────────────────────────────────────────────────────────────
+function renderStats(predictions) {
+    const vals = Object.values(predictions).map(v => Math.max(0, v));
+    const avg = vals.reduce((a,b)=>a+b,0) / (vals.length || 1);
+    document.getElementById("avgSpeed").textContent     = `${Math.round(avg*120)} km/h`;
+    document.getElementById("activeSensors").textContent = vals.filter(v=>v>-0.5).length;
+    document.getElementById("congestedNodes").textContent = vals.filter(v=>v<0.2).length;
+    document.getElementById("freeNodes").textContent     = vals.filter(v=>v>=0.45).length;
+}
+
+// ──────────────────────────────────────────────────────────────
+//  RENDER TREND CHART
+// ──────────────────────────────────────────────────────────────
+function renderTrendChart(predictions) {
+    const chart = document.getElementById("trendChart");
+    chart.innerHTML = "";
+
+    const items = Object.entries(predictions)
+        .filter(([sid]) => SENSOR_COORDS[sid])
+        .slice(0, 14);
+
+    const vals = items.map(([, v]) => Math.max(0, Math.min(1, v)));
+    const maxV = Math.max(...vals, 0.01);
+
+    items.forEach(([sid, val]) => {
+        const v = Math.max(0, Math.min(1, val));
+        const pct = (v / maxV) * 150;
+        const color = speedColor(v);
+
+        const wrap = document.createElement("div");
+        wrap.className = "trend-bar-wrap";
+
+        const valEl = document.createElement("div");
+        valEl.className = "trend-value";
+        valEl.textContent = Math.round(v * 100);
+
+        const bar = document.createElement("div");
+        bar.className = "trend-bar";
+        bar.style.height = Math.max(pct, 4) + "px";
+        bar.style.background = `linear-gradient(to top, ${color}88, ${color})`;
+
+        const label = document.createElement("div");
+        label.className = "trend-label";
+        label.textContent = sid.slice(-4);
+
+        wrap.appendChild(valEl);
+        wrap.appendChild(bar);
+        wrap.appendChild(label);
+        chart.appendChild(wrap);
+    });
+}
+
+// ──────────────────────────────────────────────────────────────
+//  RENDER SENSOR TABLE
+// ──────────────────────────────────────────────────────────────
+function renderSensorTable(predictions) {
+    const tbody = document.getElementById("sensorTableBody");
+    const countEl = document.getElementById("tableCount");
+
+    const entries = Object.entries(predictions)
+        .filter(([sid]) => SENSOR_COORDS[sid])
+        .sort(([,a],[,b]) => a - b); // most congested first
+
+    countEl.textContent = `${entries.length} sensors`;
+    tbody.innerHTML = "";
+
+    entries.forEach(([sid, val]) => {
+        const v = Math.max(0, Math.min(1, val));
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td style="font-family:monospace;color:#b8c7d9;">${sid}</td>
+            <td style="color:white;">${Math.round(v*120)} km/h</td>
+            <td><span class="speed-badge ${speedClass(v)}">${speedLabel(v)}</span></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+// ──────────────────────────────────────────────────────────────
+//  FETCH FROM TRAFFIC SERVICE
+// ──────────────────────────────────────────────────────────────
+async function loadTrafficData() {
+    const btn = document.getElementById("refreshBtn");
+    const loading = document.getElementById("loadingMap");
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Fetching...';
+    loading.style.display = "flex";
+
+    try {
+        const resp = await fetch(`${TRAFFIC_API}/predict`, { method: "POST" });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (!data.predictions) throw new Error("No predictions in response");
+
+        currentPredictions = data.predictions;
+        const mode = document.getElementById("layerSelect").value;
+
+        renderLayers(currentPredictions, mode);
+        renderStats(currentPredictions);
+        renderTrendChart(currentPredictions);
+        renderSensorTable(currentPredictions);
+
+        document.getElementById("lastUpdated").textContent =
+            "Last updated: " + new Date().toLocaleTimeString();
+
+    } catch (err) {
+        console.error("Traffic fetch failed:", err);
+        document.getElementById("lastUpdated").textContent = "Error: " + err.message;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-rotate-right"></i> Refresh Predictions';
+        loading.style.display = "none";
+    }
+}
+
+// ──────────────────────────────────────────────────────────────
+//  EVENT LISTENERS
+// ──────────────────────────────────────────────────────────────
+document.getElementById("refreshBtn").addEventListener("click", loadTrafficData);
+
+document.getElementById("layerSelect").addEventListener("change", () => {
+    if (Object.keys(currentPredictions).length) {
+        renderLayers(currentPredictions, document.getElementById("layerSelect").value);
+    }
+});
+
+let autoInterval = null;
+function setupAutoRefresh() {
+    if (autoInterval) clearInterval(autoInterval);
+    if (document.getElementById("autoRefresh").checked) {
+        autoInterval = setInterval(loadTrafficData, 30000);
+    }
+}
+document.getElementById("autoRefresh").addEventListener("change", setupAutoRefresh);
+setupAutoRefresh();
+
+// Theme
+if (localStorage.getItem("theme") === "light") document.body.classList.add("light-theme");
+
+// Also add GIS Map link to main nav in index.html if navigating back
+// Initial load
+loadTrafficData();
+</script>
+</body>
+</html>

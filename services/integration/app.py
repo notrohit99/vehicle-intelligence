@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 
 from clients.anpr_client import ANPRClient
 from clients.tracking_client import TrackingClient
@@ -36,7 +38,13 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/health")
 async def health() -> dict:
@@ -64,7 +72,13 @@ async def process_video(
     if orchestrator is None:
         raise HTTPException(status_code=503, detail="Orchestrator not initialized")
 
-    if file.content_type and file.content_type not in VIDEO_TYPES:
+    ext = Path(file.filename or "").suffix.lower()
+    is_valid = (
+        (file.content_type in VIDEO_TYPES)
+        or (file.content_type in ("application/octet-stream", "", None))
+        or (ext in {".mp4", ".avi", ".mov", ".mkv"})
+    )
+    if not is_valid:
         raise HTTPException(status_code=400, detail=f"Unsupported video type: {file.content_type}")
 
     data = await file.read()

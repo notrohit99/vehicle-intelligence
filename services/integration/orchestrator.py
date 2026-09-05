@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import tempfile
 import time
+import gc
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -54,6 +55,7 @@ class VideoOrchestrator:
             camera_id=camera_id,
             ocr_by_tracking_id=ocr_by_tracking_id,
             job_started_at=job_started_at,
+            detections_by_track=detections_by_track,
         )
 
         return ProcessVideoResponse(
@@ -96,7 +98,8 @@ async def _ocr_tracks_from_video(
             raise ValueError("Could not open video for OCR cropping")
 
         for tracking_id, candidates in detections_by_track.items():
-            for det in candidates:
+            # Test at most top 3 highest-confidence frames per track to avoid redundant OCR work
+            for det in candidates[:3]:
                 frame_index = int(det["frame"])
                 cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
                 success, frame = cap.read()
@@ -126,21 +129,33 @@ async def _ocr_tracks_from_video(
                     continue
 
                 best_reading = max(readings, key=lambda r: float(r["confidence"]))
+                conf = float(best_reading["confidence"])
                 timestamp_sec = frame_index / fps if fps > 0 else 0.0
 
                 ocr_results[tracking_id] = OCRResult(
                     plate_number=best_reading["plate_number"],
-                    confidence=float(best_reading["confidence"]),
+                    confidence=conf,
                     bbox=best_reading["bbox"],
                     frame=frame_index,
                     timestamp_sec=timestamp_sec,
                     vehicle_bbox=[x1, y1, x2, y2],
                     class_name=str(det.get("class_name", "")),
                 )
-                break
+                # Early exit: if confidence is already good (>= 75%), stop testing more frames for this vehicle
+                if conf >= 0.75:
+                    break
 
         cap.release()
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
+        cap = None
+        gc.collect()
+        time.sleep(0.5)
 
+    finally:
+        for _ in range(5):
+            try:
+                Path(tmp_path).unlink(missing_ok=True)
+                break
+            except PermissionError:
+                gc.collect()
+                time.sleep(0.5)
     return ocr_results

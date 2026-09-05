@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 from ultralytics import YOLO
@@ -11,6 +12,8 @@ from supervision import Detections
 from bytetrack.byte_track import ByteTrack
 
 VEHICLE_CLASS_IDS = [2, 3, 5, 7]  # car, motorcycle, bus, truck
+TRACKING_PROJECT_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_MODEL_PATH = TRACKING_PROJECT_DIR / "yolov8n.pt"
 
 
 @dataclass
@@ -35,8 +38,8 @@ class VehicleTrack:
 class TrackingPipeline:
     """YOLOv8 detection + ByteTrack — returns structured tracks per frame."""
 
-    def __init__(self, yolo_weights: str = "yolov8x.pt") -> None:
-        self.model = YOLO(yolo_weights)
+    def __init__(self, yolo_weights: str | Path = DEFAULT_MODEL_PATH) -> None:
+        self.model = YOLO(str(yolo_weights))
         self.model.fuse()
         self.class_names = self.model.model.names
         self.byte_tracker = ByteTrack(
@@ -55,7 +58,7 @@ class TrackingPipeline:
         frame_index: int = 0,
         fps: float = 30.0,
     ) -> list[VehicleTrack]:
-        results = self.model(frame, verbose=False)[0]
+        results = self.model(frame, imgsz=640, verbose=False)[0]
         detections = Detections.from_ultralytics(results)
         detections = detections[np.isin(detections.class_id, VEHICLE_CLASS_IDS)]
         detections = self.byte_tracker.update_with_detections(detections)

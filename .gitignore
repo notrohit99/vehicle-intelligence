@@ -15,12 +15,6 @@ env/
 *.onnx
 *.weights
 
-# Video and large data files
-*.mp4
-*.avi
-*.mov
-*.mkv
-
 # Python cache/testing
 .pytest_cache/
 .coverage
@@ -41,6 +35,12 @@ build/
 # Logs
 *.log
 
+# Large Datasets & Videos
+*.h5
+*.hdf5
+*.pkl
+output/
+
 # OS
 .DS_Store
-Thumbs.db
+Thumbs.db

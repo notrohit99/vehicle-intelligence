@@ -10,7 +10,12 @@ import numpy as np
 from ultralytics import YOLO
 from paddleocr import PaddleOCR
 
+from pathlib import Path
+
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
+ANPR_PROJECT_DIR = Path(__file__).resolve().parents[1]
+DEFAULT_MODEL_PATH = ANPR_PROJECT_DIR / "yolov8n.pt"
 
 CONFIDENCE_THRESHOLD = 95.0  # percent, matches original: score * 100 > 95
 YOLO_CONF = 0.8
@@ -50,10 +55,10 @@ class ANPRPipeline:
 
     def __init__(
         self,
-        yolo_weights: str = "yolov8n.pt",
+        yolo_weights: str | Path = DEFAULT_MODEL_PATH,
         ocr_lang: str = "en",
     ) -> None:
-        self.model = YOLO(yolo_weights)
+        self.model = YOLO(str(yolo_weights))
         self.ocr = PaddleOCR(use_angle_cls=True, lang=ocr_lang, show_log=False)
 
     def _run_detection(

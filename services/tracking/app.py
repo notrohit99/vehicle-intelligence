@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 
@@ -68,7 +69,13 @@ async def track_video(file: UploadFile = File(...)) -> TrackingResponse:
     if service is None:
         raise HTTPException(status_code=503, detail="Service not initialized")
 
-    if file.content_type and file.content_type not in VIDEO_TYPES:
+    ext = Path(file.filename or "").suffix.lower()
+    is_valid = (
+        (file.content_type in VIDEO_TYPES)
+        or (file.content_type in ("application/octet-stream", "", None))
+        or (ext in {".mp4", ".avi", ".mov", ".mkv"})
+    )
+    if not is_valid:
         raise HTTPException(status_code=400, detail=f"Unsupported video type: {file.content_type}")
 
     data = await file.read()

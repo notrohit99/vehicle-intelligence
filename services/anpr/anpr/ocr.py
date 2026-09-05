@@ -11,7 +11,7 @@ from paddleocr import PaddleOCR
 
 os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
 
-CONFIDENCE_THRESHOLD = 95.0  # percent, matches original pipeline
+DEFAULT_CONFIDENCE_THRESHOLD = float(os.getenv("OCR_CONFIDENCE_THRESHOLD", "50.0"))
 
 
 @dataclass
@@ -24,7 +24,8 @@ class PlateReading:
 class PlateOCR:
     """Runs PaddleOCR on a vehicle crop without YOLO detection."""
 
-    def __init__(self, ocr_lang: str = "en") -> None:
+    def __init__(self, ocr_lang: str = "en", min_confidence: float = DEFAULT_CONFIDENCE_THRESHOLD) -> None:
+        self.min_confidence = min_confidence
         self._ocr = PaddleOCR(use_angle_cls=True, lang=ocr_lang, show_log=False)
 
     def read_image_bytes(
@@ -57,7 +58,7 @@ class PlateOCR:
                 text = line[1][0]
                 score = float(line[1][1])
 
-                if CONFIDENCE_THRESHOLD < (score * 100.0):
+                if self.min_confidence <= (score * 100.0):
                     x_coords = box[:, 0]
                     y_coords = box[:, 1]
                     readings.append(
